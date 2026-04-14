@@ -566,49 +566,51 @@
     showSection('simulacion');
   }
   
-  // FUNCIÓN CORREGIDA - Esta es la clave
-  function calculateInflation(t, alpha, beta, M0, pi0) {
+function calculateInflation(t, alpha, beta, M0, pi0_decimal) {
     // Evitar división por cero
     if (beta === 0) beta = 0.001;
-    if (pi0 === 0) pi0 = 0.001;
+    if (pi0_decimal <= 0) pi0_decimal = 0.001;
     
     // Punto de equilibrio
     const equilibrium = (alpha * M0) / beta;
     
     // Constante de integración
-    const C = (1 / pi0) - equilibrium;
+    const C = (1 / pi0_decimal) - equilibrium;
     
-    // Solución: π(t) = 1 / (equilibrium + C*e^(β*t))
-    const exponential = Math.exp(beta * t);
-    const denominator = equilibrium + (C * exponential);
-    
-    // Evitar división por cero
-    if (Math.abs(denominator) < 0.0001) {
-      return 0.001;
+    // Verificar si habrá explosión hiperinflacionaria (denominador → 0)
+    if (C < 0) {
+        const t_explosion = Math.log(-equilibrium / C) / beta;
+        if (t >= t_explosion && t_explosion > 0) {
+            return 999; // Inflación extremadamente alta (explosión)
+        }
     }
     
-    const result = 1 / denominator;
+    // Calcular denominador: equilibrium + C * e^(β*t)
+    const denominator = equilibrium + (C * Math.exp(beta * t));
     
-    // Asegurar que el resultado sea positivo y razonable
-    return Math.max(0.001, Math.min(result * 100, 1000));
-  }
+    // Evitar división por cero o valores muy pequeños
+    if (Math.abs(denominator) < 0.0001) {
+        return 999;
+    }
+
+    const result = 1 / denominator;
+    return Math.max(0, result * 100);
+}
   
-  function runSimulation() {
+function runSimulation() {
     const alpha = currentParams.alpha;
     const beta = currentParams.beta;
     const M0 = currentParams.M0;
-    const pi0 = currentParams.pi0 / 100; // Convertir a decimal
-    
-    console.log('Parámetros:', { alpha, beta, M0, pi0 });
+    const pi0_decimal = currentParams.pi0 / 100; // Convertir % a decimal
     
     const timePoints = [];
     const inflationPoints = [];
     
     // Simular para 10 años
     for (let t = 0; t <= 10; t += 0.1) {
-      timePoints.push(t.toFixed(1));
-      const pi = calculateInflation(t, alpha, beta, M0, pi0);
-      inflationPoints.push(pi);
+        timePoints.push(t.toFixed(1));
+        const pi = calculateInflation(t, alpha, beta, M0, pi0_decimal);
+        inflationPoints.push(pi);
       
       // Debug: mostrar primeros valores
       if (t <= 0.2) {
